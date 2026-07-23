@@ -1,0 +1,75 @@
+TROUBLESHOOTING GUIDE - ENTERPRISE AI SUPPORT AGENT
+====================================================
+
+QUICK REFERENCE
+---------------
+1. System Health Check
+2. Common Error Codes
+3. Debug Commands
+4. Performance Optimization
+5. Security Guidelines
+
+SYSTEM HEALTH CHECK
+-------------------
+Command: python -m src.main --health
+
+Checks:
+- Azure OpenAI connection
+- ChromaDB connectivity
+- Agent registry status
+- Configuration validation
+- Memory usage
+
+Expected Output:
+✓ Azure OpenAI: Connected
+✓ ChromaDB: Healthy
+✓ Agent Registry: 6 agents registered
+✓ Configuration: Valid
+✓ Memory Usage: 45% (OK)
+
+COMMON ERROR CODES
+------------------
+ERR_001: Azure OpenAI API Error
+- Check API key: grep AZURE_OPENAI .env
+- Check endpoint: Verify URL format
+- Check quota: Verify usage limits
+
+ERR_002: ChromaDB Connection Failed
+- Check persistence directory: ls -la data/chromadb/
+- Check permissions: chmod 755 data/chromadb/
+- Restart service: docker-compose restart chromadb
+
+ERR_003: Agent Not Found
+- Check registry: python -m src.main --list-agents
+- Verify agent ID: Check agent_registry.py
+- Restart system: docker-compose restart app
+
+DEBUG COMMANDS
+--------------
+Enable debug logging:
+export LOG_LEVEL=DEBUG
+python -m src.main
+
+View logs:
+docker-compose logs -f app
+
+Check agent status:
+python -m src.main --agent-status <agent_id>
+
+Test RAG retrieval:
+python -m src.main --test-rag "network timeout"
+
+PERFORMANCE OPTIMIZATION
+-------------------------
+1. Reduce chunk size: Set CHUNK_SIZE=500 in .env
+2. Increase retrieval results: Set RETRIEVAL_N_RESULTS=10
+3. Cache embeddings: Enable embedding cache
+4. Use streaming: Enable response streaming
+
+SECURITY GUIDELINES
+-------------------
+1. Never commit .env files
+2. Rotate API keys monthly
+3. Use managed identities in production
+4. Enable audit logging
+5. Regular security scans: docker run --rm -v $(pwd):/app trivy fs /app
