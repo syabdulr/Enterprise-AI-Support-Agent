@@ -3,9 +3,9 @@
 A production-grade multi-agent incident response system powered by LangChain, LangGraph, and Retrieval-Augmented Generation (RAG).
 
 [![CI/CD](https://github.com/syabdulr/Enterprise-AI-Support-Agent/workflows/CI%2FCD%20Pipeline/badge.svg)](https://github.com/syabdulr/Enterprise-AI-Support-Agent/actions)
-[![Docker](https://github.com/syabdulr/Enterprise-AI-Support-Agent/workflows/Docker%20Build%20and%20Push/badge.svg)](https://github.com/syabdulr/Enterprise-AI-Support-Agent/actions/workflows/docker.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python 3.11](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+|[![Docker](https://github.com/syabdulr/Enterprise-AI-Support-Agent/workflows/Docker%20Build/badge.svg)](https://github.com/syabdulr/Enterprise-AI-Support-Agent/actions/workflows/docker.yml)
+|[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+|[![Python 3.11](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 
 ## 🎯 Overview
 
@@ -320,11 +320,8 @@ The project uses GitHub Actions for continuous integration and deployment:
 ### CI/CD Pipeline Jobs
 
 1. **Lint**: Code quality checks (black, isort, flake8, mypy)
-2. **Test**: Unit, integration, and E2E tests
-3. **E2E**: End-to-end tests with services
-4. **Security**: Trivy vulnerability scan, Bandit security linter
-5. **Build**: Docker image build
-6. **Deploy**: Deployment to dev/staging/production
+2. **Test**: Unit and integration tests
+3. **Build**: Docker image build
 
 ### Workflow Triggers
 
