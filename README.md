@@ -237,6 +237,40 @@ curl http://localhost:8000/health
 | POST | `/llm/chat` | Direct LLM interaction |
 | GET | `/components` | Component status |
 
+## 📸 Screenshots
+
+### API Documentation - Swagger UI
+
+![Swagger UI](docs/screenshots/01-swagger-ui.png)
+
+Interactive API documentation with Swagger UI showing all endpoints, schemas, and example requests.
+
+### Health Check Endpoint
+
+![Health Check Endpoint](docs/screenshots/02-health-check-endpoint.png)
+
+Expanded health check endpoint showing GET request details, parameters, and response schema.
+
+### System Health Status
+
+```bash
+$ curl http://localhost:8000/health
+
+{
+  "status": "healthy",
+  "service": "enterprise-ai-support-agent",
+  "version": "1.0.0",
+  "components": {
+    "api": "healthy",
+    "llm": "healthy",
+    "rag": "healthy",
+    "database": "healthy"
+  }
+}
+```
+
+✓ All systems operational
+
 ## 🐳 Docker Deployment
 
 ### Quick Start with Docker Compose

@@ -1,0 +1,23 @@
+┌──────────────────────────────────────────────────────────────────┐
+│ Enterprise AI Support Agent - API Health Check                   │
+└──────────────────────────────────────────────────────────────────┘
+
+[1m$[0m curl http://localhost:8000/health
+
+{
+  [34m"status"[0m: [32m"healthy"[0m,
+  [34m"service"[0m: [33m"enterprise-ai-support-agent"[0m,
+  [34m"version"[0m: [36m"1.0.0"[0m,
+  [34m"components"[0m: {
+    [34m"api"[0m: [32m"healthy"[0m,
+    [34m"llm"[0m: [32m"healthy"[0m,
+    [34m"rag"[0m: [32m"healthy"[0m,
+    [34m"database"[0m: [32m"healthy"[0m
+  }
+}
+
+[32m✓ All systems operational[0m
+
+┌──────────────────────────────────────────────────────────────────┐
+│ Response Time: 12ms | Status: 200 OK                              │
+└──────────────────────────────────────────────────────────────────┘
