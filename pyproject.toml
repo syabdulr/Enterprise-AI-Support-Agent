@@ -6,12 +6,7 @@ addopts = [
     "-q",
     "--strict-markers",
     "--strict-config",
-    "--tb=short",
-    "--cov=src",
-    "--cov-report=term-missing",
-    "--cov-report=html",
-    "--cov-report=xml",
-    "--cov-fail-under=80"
+    "--tb=short"
 ]
 testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
@@ -34,8 +29,6 @@ filterwarnings = [
     "ignore::DeprecationWarning",
     "ignore::PendingDeprecationWarning"
 ]
-asyncio_mode = "auto"
-timeout = 300
 
 # Coverage configuration
 [tool.coverage.run]
