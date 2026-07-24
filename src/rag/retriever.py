@@ -4,10 +4,14 @@ Combines ChromaDB storage with embedding generation.
 """
 
 from typing import List, Dict, Optional
+import logging
+from ..utils.exceptions import RAGException, ErrorCode, wrap_exception
 from .chromadb_store import ChromaDBStore
 from .embeddings import EmbeddingGenerator
 from .document_loader import DocumentLoader
 from .chunker import TextChunker
+
+logger = logging.getLogger(__name__)
 
 
 class RAGRetriever:
@@ -44,28 +48,33 @@ class RAGRetriever:
         directory: str = "data/sample_documents"
     ) -> int:
         """Load, chunk, and index documents."""
-        # Load documents
-        if documents is None:
-            self.loader.base_directory = directory
-            documents = self.loader.load_directory()
+        try:
+            # Load documents
+            if documents is None:
+                self.loader.base_directory = directory
+                documents = self.loader.load_directory()
+            
+            if not documents:
+                logger.info("No documents found to index.")
+                return 0
+            
+            # Chunk documents
+            chunks = self.chunker.chunk_documents(documents)
+            
+            # Generate embeddings
+            texts = [chunk["content"] for chunk in chunks]
+            metadatas = [chunk["metadata"] for chunk in chunks]
+            ids = [f"chunk_{i}" for i in range(len(chunks))]
+            
+            # Add to vector store
+            self.vector_store.add_documents(texts, metadatas, ids)
+            
+            logger.info(f"Indexed {len(chunks)} chunks from {len(documents)} documents.")
+            return len(chunks)
         
-        if not documents:
-            print("No documents found to index.")
-            return 0
-        
-        # Chunk documents
-        chunks = self.chunker.chunk_documents(documents)
-        
-        # Generate embeddings
-        texts = [chunk["content"] for chunk in chunks]
-        metadatas = [chunk["metadata"] for chunk in chunks]
-        ids = [f"chunk_{i}" for i in range(len(chunks))]
-        
-        # Add to vector store
-        self.vector_store.add_documents(texts, metadatas, ids)
-        
-        print(f"Indexed {len(chunks)} chunks from {len(documents)} documents.")
-        return len(chunks)
+        except Exception as e:
+            logger.error(f"Error indexing documents: {e}")
+            raise wrap_exception(e, ErrorCode.VECTOR_STORE_ERROR, "Failed to index documents", recoverable=True)
     
     def retrieve(
         self,
@@ -73,19 +82,28 @@ class RAGRetriever:
         n_results: int = 5
     ) -> List[Dict]:
         """Retrieve relevant documents for a query."""
-        results = self.vector_store.query(query, n_results=n_results)
+        try:
+            results = self.vector_store.query(query, n_results=n_results)
+            
+            retrieved_docs = []
+            if results['documents'] and results['documents'][0]:
+                for i, doc in enumerate(results['documents'][0]):
+                    retrieved_docs.append({
+                        "content": doc,
+                        "metadata": results['metadatas'][0][i],
+                        "distance": results['distances'][0][i] if 'distances' in results else None
+                    })
+            
+            return retrieved_docs
         
-        retrieved_docs = []
-        if results['documents'] and results['documents'][0]:
-            for i, doc in enumerate(results['documents'][0]):
-                retrieved_docs.append({
-                    "content": doc,
-                    "metadata": results['metadatas'][0][i],
-                    "distance": results['distances'][0][i] if 'distances' in results else None
-                })
-        
-        return retrieved_docs
+        except Exception as e:
+            logger.error(f"Error retrieving documents: {e}")
+            raise wrap_exception(e, ErrorCode.RETRIEVAL_ERROR, "Failed to retrieve documents", recoverable=True)
     
     def get_collection_info(self) -> Dict:
         """Get information about the indexed collection."""
-        return self.vector_store.get_collection_info()
+        try:
+            return self.vector_store.get_collection_info()
+        except Exception as e:
+            logger.error(f"Error getting collection info: {e}")
+            raise wrap_exception(e, ErrorCode.VECTOR_STORE_ERROR, "Failed to get collection info", recoverable=True)
