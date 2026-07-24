@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  # Enterprise AI Support Agent API (Development)
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: enterprise-ai-api-dev
+    ports:
+      - "8000:8000"
+    environment:
+      - AZURE_OPENAI_API_KEY=${AZURE_OPENAI_API_KEY}
+      - AZURE_OPENAI_ENDPOINT=${AZURE_OPENAI_ENDPOINT}
+      - AZURE_OPENAI_API_VERSION=${AZURE_OPENAI_API_VERSION:-2024-02-15-preview}
+      - AZURE_OPENAI_CHAT_DEPLOYMENT=${AZURE_OPENAI_CHAT_DEPLOYMENT:-gpt-4}
+      - AZURE_OPENAI_EMBEDDING_DEPLOYMENT=${AZURE_OPENAI_EMBEDDING_DEPLOYMENT:-text-embedding-ada-002}
+      - LOG_LEVEL=${LOG_LEVEL:-DEBUG}
+      - CHROMADB_PERSIST_DIRECTORY=/app/data/chromadb
+      - CHROMADB_COLLECTION_NAME=${CHROMADB_COLLECTION_NAME:-incident_knowledge}
+      - RELOAD=true
+    volumes:
+      - ./src:/app/src
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - chromadb_data:/app/data/chromadb
+    env_file:
+      - .env
+    restart: unless-stopped
+    command: ["python", "-m", "uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    networks:
+      - ai_network
+
+volumes:
+  chromadb_data:
+    driver: local
+
+networks:
+  ai_network:
+    driver: bridge
