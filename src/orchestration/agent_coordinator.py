@@ -1,6 +1,7 @@
 """
 Agent coordinator for multi-agent workflows.
 Routes incidents to appropriate agents and manages agent transitions.
+Updated to handle confidence-based routing with self-reflection.
 """
 
 from typing import Dict, List, Optional, Any
@@ -19,9 +20,15 @@ class AgentType(str, Enum):
 
 class AgentCoordinator:
     """Coordinates agent selection and workflow transitions."""
-    
-    def __init__(self):
-        """Initialize agent coordinator."""
+
+    def __init__(self, confidence_threshold: int = 70):
+        """
+        Initialize agent coordinator.
+
+        Args:
+            confidence_threshold: Minimum confidence (0-100) before continuing.
+                                   Below this, escalate to human review.
+        """
         self.agent_transitions = {
             AgentType.TRIAGE: [
                 AgentType.DIAGNOSIS,
@@ -47,38 +54,55 @@ class AgentCoordinator:
                 AgentType.TRIAGE  # Start over
             ]
         }
-    
+
+        self.confidence_threshold = confidence_threshold
+
     def determine_next_agent(
         self,
-        state: WorkflowState
+        state: WorkflowState,
+        agent_output: Optional[Dict[str, Any]] = None
     ) -> AgentType:
-        """Determine the next agent based on current state."""
+        """
+        Determine the next agent based on current state and agent output.
+
+        Args:
+            state: Current workflow state
+            agent_output: Optional output from previous agent with confidence metadata
+
+        Returns:
+            Next agent type
+        """
         current_agent = AgentType(state.current_agent)
-        
+
+        # Check agent confidence if available
+        if agent_output and agent_output.get('should_escalate', False):
+            # Agent has low confidence, escalate to human review
+            return AgentType.HUMAN_REVIEW
+
         # If severity is Critical, escalate immediately
         if state.severity == IncidentSeverity.CRITICAL and not state.escalate_immediately:
             return AgentType.ESCALATION
-        
+
         # If human review required, route to human review agent
         if state.requires_human_review and current_agent != AgentType.HUMAN_REVIEW:
             return AgentType.HUMAN_REVIEW
-        
+
         # If triage complete, move to diagnosis
         if current_agent == AgentType.TRIAGE and state.severity and state.category:
             return AgentType.DIAGNOSIS
-        
+
         # If diagnosis complete, move to resolution
         if current_agent == AgentType.DIAGNOSIS and state.root_causes:
             return AgentType.RESOLUTION
-        
+
         # If resolution complete, workflow done
         if current_agent == AgentType.RESOLUTION and state.resolution_status == "Complete":
             state.workflow_status = "completed"
             return current_agent
-        
+
         # Default: escalate if uncertain
         return AgentType.ESCALATION
-    
+
     def can_transition_to(
         self,
         from_agent: AgentType,
@@ -86,7 +110,7 @@ class AgentCoordinator:
     ) -> bool:
         """Check if transition from one agent to another is allowed."""
         return to_agent in self.agent_transitions.get(from_agent, [])
-    
+
     def get_agent_description(self, agent_type: AgentType) -> str:
         """Get description of an agent's role."""
         descriptions = {
@@ -97,39 +121,57 @@ class AgentCoordinator:
             AgentType.HUMAN_REVIEW: "Facilitates human review of AI recommendations, captures human decisions"
         }
         return descriptions.get(agent_type, "Unknown agent")
-    
+
     def should_escalate(self, state: WorkflowState) -> bool:
         """Determine if incident should be escalated to human review."""
         # Escalate if critical
         if state.severity == IncidentSeverity.CRITICAL:
             return True
-        
+
         # Escalate if high priority with significant errors
         if state.priority == IncidentPriority.P0 and state.errors:
             return True
-        
+
         # Escalate if requested
         if state.escalate_immediately:
             return True
-        
+
         # Escalate if high escalation risk
         if state.escalation_risk == "High":
             return True
-        
+
         return False
-    
+
     def requires_human_verification(self, state: WorkflowState) -> bool:
         """Determine if human verification is required."""
         # Require verification for critical incidents
         if state.severity == IncidentSeverity.CRITICAL:
             return True
-        
+
         # Require verification for security incidents
         if state.category and "security" in state.category.lower():
             return True
-        
+
         # Require verification if there are errors
         if state.errors:
             return True
-        
+
         return False
+
+    def should_escalate_low_confidence(
+        self,
+        agent_output: Dict[str, Any]
+    ) -> bool:
+        """
+        Determine if agent output should be escalated due to low confidence.
+
+        Args:
+            agent_output: Agent output with confidence metadata
+
+        Returns:
+            True if should escalate, False otherwise
+        """
+        confidence = agent_output.get('confidence', 100)
+
+        # Escalate if confidence below threshold
+        return confidence < self.confidence_threshold
