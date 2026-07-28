@@ -1,10 +1,19 @@
 """
 Self-Reflection Mixin - Enables agents to critique and improve their own decisions.
+Updated with LLM-powered critique and automated self-correction.
 """
 
 from typing import Dict, List, Optional, Any
 import logging
 from datetime import datetime
+
+try:
+    from .self_critique_engine import SelfCritiqueEngine
+    from .self_correction_engine import SelfCorrectionEngine
+    CRITIQUE_AVAILABLE = True
+except ImportError:
+    CRITIQUE_AVAILABLE = False
+    logging.warning("SelfCritiqueEngine or SelfCorrectionEngine not available")
 
 
 class SelfReflectionMixin:
@@ -13,9 +22,10 @@ class SelfReflectionMixin:
 
     Agents using this mixin can:
     - Score their own confidence (0-100)
-    - Critique their own decisions
+    - Critique their own decisions using LLM
     - Identify mistakes and improvements
     - Auto-escalate for low-confidence decisions
+    - Self-correct with automated retry
     - Log reflections for learning
     """
 
@@ -28,11 +38,45 @@ class SelfReflectionMixin:
         self._confidence_threshold: int = 70  # Escalate if confidence < 70
         self._reflection_history: List[Dict[str, Any]] = []
 
+        # LLM critique and self-correction
+        self._use_llm_critique: bool = CRITIQUE_AVAILABLE
+        self._critique_engine: Optional[Any] = None
+        self._correction_engine: Optional[Any] = None
+        self._max_correction_retries: int = 3
+
         # Get logger from parent class
         if hasattr(self, 'logger'):
             self.logger = self.logger
         else:
             self.logger = logging.getLogger(f"agent.{self.__class__.__name__}")
+
+        # Initialize critique engine if available
+        if CRITIQUE_AVAILABLE and self._use_llm_critique:
+            self._initialize_engines()
+
+    def _initialize_engines(self) -> None:
+        """Initialize critique and correction engines."""
+        try:
+            if hasattr(self, 'llm_client'):
+                self._critique_engine = SelfCritiqueEngine(self.llm_client)
+                self._correction_engine = SelfCorrectionEngine()
+                self.logger.info("Self-critique and self-correction engines initialized")
+            else:
+                self.logger.warning("No LLM client available, skipping critique engine")
+                self._use_llm_critique = False
+        except Exception as e:
+            self.logger.error(f"Failed to initialize engines: {e}", exc_info=True)
+            self._use_llm_critique = False
+
+    def enable_llm_critique(self, enabled: bool = True) -> None:
+        """
+        Enable or disable LLM-powered critique.
+
+        Args:
+            enabled: True to enable, False to disable
+        """
+        self._use_llm_critique = enabled and CRITIQUE_AVAILABLE
+        self.logger.info(f"LLM critique {'enabled' if self._use_llm_critique else 'disabled'}")
 
     def enable_reflection(self, enabled: bool = True) -> None:
         """
@@ -119,7 +163,7 @@ class SelfReflectionMixin:
         """
         Reflect on agent output and identify improvements.
 
-        This method uses the LLM to generate a self-critique.
+        If LLM critique is enabled, generates detailed critique using LLM.
 
         Args:
             input_data: Original input data
@@ -144,16 +188,36 @@ class SelfReflectionMixin:
             'input': input_data,
             'output': output_data,
             'confidence': confidence,
-            'critique': None,  # Will be filled by LLM
-            'improvements': [],  # Will be filled by LLM
             'action': None  # 'continue', 'escalate', 'retry'
         }
 
-        # Determine action based on confidence
-        if confidence >= self._confidence_threshold:
-            reflection['action'] = 'continue'
+        # Generate LLM critique if enabled
+        if self._use_llm_critique and self._critique_engine:
+            try:
+                critique = await self._critique_engine.generate_critique(
+                    agent_name=self.name,
+                    agent_capabilities=self.get_capabilities(),
+                    input_data=input_data,
+                    output_data=output_data,
+                    confidence_score=confidence
+                )
+
+                reflection['critique'] = critique
+
+                # Use critique to determine action
+                reflection['action'] = critique.get('should_escalate', 'continue')
+                reflection['escalation_reason'] = critique.get('escalation_reason', None)
+
+            except Exception as e:
+                self.logger.error(f"Failed to generate critique: {e}", exc_info=True)
+                reflection['critique_error'] = str(e)
+                reflection['action'] = 'continue' if confidence >= self._confidence_threshold else 'escalate'
         else:
-            reflection['action'] = 'escalate'
+            # Determine action based on confidence only
+            if confidence >= self._confidence_threshold:
+                reflection['action'] = 'continue'
+            else:
+                reflection['action'] = 'escalate'
 
         # Store reflection in history
         self._reflection_history.append(reflection)
@@ -164,6 +228,56 @@ class SelfReflectionMixin:
         )
 
         return reflection
+
+    async def self_correct(
+        self,
+        input_data: Dict[str, Any],
+        output_data: Dict[str, Any],
+        feedback: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Attempt to self-correct based on feedback or reflection.
+
+        Args:
+            input_data: Original input data
+            output_data: Original output data
+            feedback: Optional feedback from human or other agent
+
+        Returns:
+            Corrected output data
+        """
+        if not self._reflection_enabled or not self._correction_engine:
+            self.logger.warning("Self-correction attempted but unavailable")
+            return output_data
+
+        self.logger.info("Attempting self-correction...")
+
+        try:
+            # Get latest critique if available
+            critique = None
+            if self._reflection_history:
+                latest_reflection = self._reflection_history[-1]
+                critique = latest_reflection.get('critique')
+
+            # Use correction engine
+            corrected_output = await self._correction_engine.self_correct(
+                agent=self,
+                input_data=input_data,
+                original_output=output_data,
+                feedback=feedback,
+                critique=critique,
+                max_retries=self._max_correction_retries
+            )
+
+            self.logger.info("Self-correction complete")
+            return corrected_output
+
+        except Exception as e:
+            self.logger.error(f"Self-correction failed: {e}", exc_info=True)
+
+            # Return original output if correction fails
+            output_data['correction_error'] = str(e)
+            return output_data
 
     def should_escalate(self, output_data: Dict[str, Any]) -> bool:
         """
@@ -205,18 +319,27 @@ class SelfReflectionMixin:
                 'total_reflections': 0,
                 'average_confidence': 0,
                 'escalation_rate': 0,
-                'total_escalations': 0
+                'total_escalations': 0,
+                'critique_enabled': self._use_llm_critique,
+                'correction_enabled': self._correction_engine is not None
             }
 
         total = len(self._reflection_history)
         total_confidence = sum(r['confidence'] for r in self._reflection_history)
         escalations = sum(1 for r in self._reflection_history if r['action'] == 'escalate')
 
+        # Count critiques
+        critiques = sum(1 for r in self._reflection_history if 'critique' in r)
+
         return {
             'total_reflections': total,
             'average_confidence': total_confidence / total,
             'escalation_rate': escalations / total * 100,
             'total_escalations': escalations,
+            'total_critiques': critiques,
+            'critique_rate': critiques / total * 100,
+            'critique_enabled': self._use_llm_critique,
+            'correction_enabled': self._correction_engine is not None,
             'confidence_distribution': {
                 'high': sum(1 for r in self._reflection_history if r['confidence'] >= 80),
                 'medium': sum(1 for r in self._reflection_history if 60 <= r['confidence'] < 80),
@@ -246,6 +369,12 @@ Average Confidence: {metrics['average_confidence']:.1f}%
 Escalation Rate: {metrics['escalation_rate']:.1f}%
 Total Escalations: {metrics['total_escalations']}
 
+Advanced Features:
+- LLM Critique: {'Enabled' if metrics['critique_enabled'] else 'Disabled'}
+- Self-Correction: {'Enabled' if metrics['correction_enabled'] else 'Disabled'}
+- Total Critiques: {metrics.get('total_critiques', 0)}
+- Critique Rate: {metrics.get('critique_rate', 0):.1f}%
+
 Confidence Distribution:
   High (80%+): {metrics['confidence_distribution']['high']}
   Medium (60-79%): {metrics['confidence_distribution']['medium']}
@@ -255,10 +384,12 @@ Recent Reflections (Last 5):
 """
         recent_reflections = self.get_reflection_history(limit=5)
         for i, reflection in enumerate(recent_reflections, 1):
+            has_critique = 'critique' in reflection
             report += f"""
 {i}. {reflection['timestamp']}
    Confidence: {reflection['confidence']}%
    Action: {reflection['action']}
+   Critique: {'Yes' if has_critique else 'No'}
 """
 
         return report
