@@ -1,5 +1,7 @@
 # Enterprise AI Support Agent
 
+> **Note:** This multi-agent RAG system was developed as internal infrastructure to support FXPE (Autonomous Multi-Agent Trading Platform) operations. It provides autonomous incident response, self-reflection capabilities, and hierarchical agent orchestration to maintain FXPE platform reliability.
+
 A production-grade multi-agent incident response system powered by LangChain, LangGraph, and Retrieval-Augmented Generation (RAG).
 
 ## 🚀 What's New
