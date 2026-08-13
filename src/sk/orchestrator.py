@@ -1,16 +1,11 @@
 """SK-based orchestrator for multi-agent incident response.
 
-This orchestrator demonstrates the four agentic patterns the Aecon JD requires:
-- Planning: creates a step plan before executing
-- Tool-use: invokes kernel functions (triage, diagnose, resolve)
-- Memory/state: stores incident history across requests
-- Guardrails: checks every response via GuardrailPlugin
-
-It wraps the Semantic Kernel manager and coordinates plugins to handle
-incidents end-to-end, showing how Semantic Kernel can orchestrate agents
-for enterprise incident response workflows.
+Coordinates plugins through the real Semantic Kernel to process incidents
+end-to-end: planning, RAG grounding, triage, diagnosis, resolution, and
+guardrail checking.
 """
 
+import json
 from typing import Any, Dict, List, Optional
 
 from .kernel_setup import SemanticKernelManager
@@ -24,9 +19,8 @@ class SKOrchestrator:
         self.kernel = kernel_manager
         self._incident_history: List[Dict[str, Any]] = []
 
-    def process_incident(self, request: SKAgentRequest) -> SKAgentResponse:
-        """
-        Process an incident through the full SK pipeline.
+    async def process_incident(self, request: SKAgentRequest) -> SKAgentResponse:
+        """Process an incident through the full SK pipeline.
 
         Steps:
         1. Plan: Determine execution plan based on severity
@@ -41,83 +35,89 @@ class SKOrchestrator:
         rag_used = False
         guardrail_checked = False
 
-        # Step 1: Create execution plan (planning pattern)
+        # Step 1: Create execution plan
         plan = self._create_plan(request)
         steps.append({"step": "planning", "plan": plan})
 
-        # Step 2: RAG grounding (memory pattern)
-        rag_result = None
+        # Step 2: RAG grounding
         if "RAGPlugin" in self.kernel.list_plugins():
-            rag_result = self.kernel.invoke_function(
+            rag_result = await self.kernel.invoke_function(
                 "RAGPlugin",
                 "get_relevant_context",
                 incident_description=request.description,
                 max_chunks=2,
             )
             rag_used = True
-            rag_sources = rag_result.get("sources", []) if rag_result else None
-            steps.append({"step": "rag_grounding", "result": rag_result})
+            rag_data = json.loads(str(rag_result))
+            rag_sources = rag_data.get("sources", [])
+            steps.append({"step": "rag_grounding", "result": rag_data})
 
-        # Step 3: Triage (tool-use pattern)
-        triage_result = None
+        # Step 3: Triage
+        triage_data = None
+        category = "general"
         if "IncidentPlugin" in self.kernel.list_plugins():
-            triage_result = self.kernel.invoke_function(
+            triage_result = await self.kernel.invoke_function(
                 "IncidentPlugin",
                 "triage_incident",
                 description=request.description,
                 severity=request.severity,
             )
-            steps.append({"step": "triage", "agent": "triage", "result": triage_result})
+            triage_data = json.loads(str(triage_result))
+            category = triage_data.get("category", "general")
+            steps.append({"step": "triage", "agent": "triage", "result": triage_data})
 
         # Step 4: Diagnose
-        category = triage_result.get("category", "general") if triage_result else "general"
-        diagnosis_result = None
+        diagnosis_data = None
         if "IncidentPlugin" in self.kernel.list_plugins():
-            diagnosis_result = self.kernel.invoke_function(
+            context_str = json.dumps(request.context) if request.context else None
+            diagnosis_result = await self.kernel.invoke_function(
                 "IncidentPlugin",
                 "diagnose_incident",
                 description=request.description,
                 category=category,
-                context=request.context,
+                context=context_str,
             )
-            steps.append({"step": "diagnosis", "agent": "diagnosis", "result": diagnosis_result})
+            diagnosis_data = json.loads(str(diagnosis_result))
+            steps.append({"step": "diagnosis", "agent": "diagnosis", "result": diagnosis_data})
 
         # Step 5: Resolve
+        resolution_data = None
         diagnosis_str = ""
-        if diagnosis_result and diagnosis_result.get("probable_causes"):
-            diagnosis_str = diagnosis_result["probable_causes"][0]
+        if diagnosis_data and diagnosis_data.get("probable_causes"):
+            diagnosis_str = diagnosis_data["probable_causes"][0]
 
-        resolution_result = None
         if "IncidentPlugin" in self.kernel.list_plugins():
-            resolution_result = self.kernel.invoke_function(
+            resolution_result = await self.kernel.invoke_function(
                 "IncidentPlugin",
                 "resolve_incident",
                 description=request.description,
                 diagnosis=diagnosis_str,
                 category=category,
             )
-            steps.append({"step": "resolution", "agent": "resolution", "result": resolution_result})
+            resolution_data = json.loads(str(resolution_result))
+            steps.append({"step": "resolution", "agent": "resolution", "result": resolution_data})
 
-        # Step 6: Guardrail check (guardrail pattern)
+        # Step 6: Guardrail check
         final_output = ""
-        if resolution_result:
-            final_output = " ".join(resolution_result.get("steps", []))
+        if resolution_data:
+            final_output = " ".join(resolution_data.get("steps", []))
 
         if "GuardrailPlugin" in self.kernel.list_plugins():
-            guardrail_result = self.kernel.invoke_function(
+            guardrail_result = await self.kernel.invoke_function(
                 "GuardrailPlugin",
                 "check_content",
                 content=final_output,
                 check_type="all",
             )
             guardrail_checked = True
-            steps.append({"step": "guardrail_check", "result": guardrail_result})
+            guardrail_data = json.loads(str(guardrail_result))
+            steps.append({"step": "guardrail_check", "result": guardrail_data})
 
-            if not guardrail_result.get("passed", True):
-                final_output = guardrail_result.get("sanitized", final_output)
+            if not guardrail_data.get("passed", True):
+                final_output = guardrail_data.get("sanitized", final_output)
 
         # Build confidence score
-        confidence = 0.85 if triage_result and diagnosis_result else 0.5
+        confidence = 0.85 if triage_data and diagnosis_data else 0.5
 
         # Store in memory
         self._incident_history.append(
@@ -161,5 +161,5 @@ class SKOrchestrator:
         return plan
 
     def get_incident_history(self) -> List[Dict[str, Any]]:
-        """Get history of all processed incidents (memory/state pattern)."""
+        """Get history of all processed incidents."""
         return list(self._incident_history)

@@ -1,17 +1,18 @@
-"""RAG plugin for Semantic Kernel integration.
+"""RAG plugin for Semantic Kernel.
 
-Wraps our existing ChromaDB-based RAG pipeline as SK kernel functions,
-demonstrating how SK agents can ground their responses in enterprise
-knowledge bases.
+Provides knowledge base search as kernel functions for grounding
+agent responses in enterprise documentation.
 """
 
+import json
 from typing import Any, Dict, List, Optional
+
+from semantic_kernel.functions import kernel_function
 
 
 class RAGPlugin:
     """SK plugin for retrieval-augmented generation."""
 
-    # Simulated knowledge base (in production, this calls ChromaDB)
     _KNOWLEDGE_BASE: List[Dict[str, str]] = [
         {
             "category": "infrastructure",
@@ -48,18 +49,14 @@ class RAGPlugin:
     def __init__(self) -> None:
         self.name = "RAGPlugin"
 
+    @kernel_function(description="Search the knowledge base for documents relevant to a query")
     def search_knowledge_base(
         self,
         query: str,
         top_k: int = 3,
         filter_category: Optional[str] = None,
-    ) -> Dict[str, Any]:
-        """
-        Search the knowledge base for relevant documents.
-
-        Implements the memory pattern: SK agents can retrieve context
-        from enterprise knowledge bases.
-        """
+    ) -> str:
+        """Search the knowledge base for relevant documents."""
         query_lower = query.lower()
         results: List[Dict[str, Any]] = []
 
@@ -67,11 +64,10 @@ class RAGPlugin:
             if filter_category and doc["category"] != filter_category:
                 continue
 
-            # Simple keyword-based relevance scoring
             query_words = set(query_lower.split())
             content_words = set(doc["content"].lower().split())
             overlap = query_words.intersection(content_words)
-            score: float = len(overlap) / max(len(query_words), 1)
+            score: float = float(len(overlap)) / max(len(query_words), 1)
 
             if score > 0 or not query_words:
                 results.append(
@@ -82,37 +78,35 @@ class RAGPlugin:
                     }
                 )
 
-        results.sort(key=lambda x: x["relevance_score"], reverse=True)
+        results.sort(key=lambda x: float(x["relevance_score"]), reverse=True)
         results = results[:top_k]
 
-        return {
+        result: Dict[str, Any] = {
             "query": query,
             "results": results,
             "total_found": len(results),
         }
+        return json.dumps(result)
 
+    @kernel_function(description="Get relevant context from the knowledge base for an incident")
     def get_relevant_context(
         self,
         incident_description: str,
         max_chunks: int = 2,
-    ) -> Dict[str, Any]:
-        """
-        Get relevant context for an incident from the knowledge base.
-
-        Used by SK agents to ground their diagnosis and resolution
-        in enterprise documentation.
-        """
-        search_result = self.search_knowledge_base(
+    ) -> str:
+        """Get relevant context for an incident from the knowledge base."""
+        search_json = self.search_knowledge_base(
             query=incident_description,
             top_k=max_chunks,
         )
+        search_result = json.loads(search_json)
 
-        # Combine top chunks into a context string
         context_chunks = [r["content"] for r in search_result["results"]]
 
-        return {
+        result: Dict[str, Any] = {
             "incident": incident_description,
             "context": " ".join(context_chunks),
             "sources": [r["category"] for r in search_result["results"]],
             "chunk_count": len(context_chunks),
         }
+        return json.dumps(result)

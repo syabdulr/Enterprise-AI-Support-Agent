@@ -1,23 +1,23 @@
-"""Guardrail plugin for Semantic Kernel integration.
+"""Guardrail plugin for Semantic Kernel.
 
-Wraps the AI Infrastructure Platform's guardrail engine as SK kernel
-functions, ensuring every agent response is checked for PII, harmful
-content, and prompt injection before being returned to the user.
+Checks agent outputs for PII, harmful content, and prompt injection
+before they are returned to the user.
 """
 
+import json
 import re
 from typing import Any, Dict
+
+from semantic_kernel.functions import kernel_function
 
 
 class GuardrailPlugin:
     """SK plugin for responsible AI guardrails."""
 
-    # PII patterns (shared with AI Infrastructure Platform)
     _SSN_PATTERN = re.compile(r"\b\d{3}-\d{2}-\d{4}\b")
     _EMAIL_PATTERN = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b")
     _PHONE_PATTERN = re.compile(r"\b\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b")
 
-    # Harmful content keywords
     _HARMFUL_KEYWORDS = [
         "hack",
         "exploit",
@@ -32,18 +32,10 @@ class GuardrailPlugin:
     def __init__(self) -> None:
         self.name = "GuardrailPlugin"
 
-    def check_content(self, content: str, check_type: str = "all") -> Dict[str, Any]:
-        """
-        Check content for guardrail violations.
-
-        Args:
-            content: The text to check.
-            check_type: Type of check - 'pii', 'harmful', 'injection', or 'all'.
-
-        Returns:
-            Dict with passed, violations, and sanitized content.
-        """
-        violations = []
+    @kernel_function(description="Check content for PII, harmful content, and prompt injection")
+    def check_content(self, content: str, check_type: str = "all") -> str:
+        """Check content for guardrail violations."""
+        violations: list = []
 
         if check_type in ("pii", "all"):
             violations.extend(self._check_pii(content))
@@ -57,12 +49,13 @@ class GuardrailPlugin:
         passed = len(violations) == 0
         sanitized = self._redact(content) if not passed else content
 
-        return {
+        result: Dict[str, Any] = {
             "passed": passed,
             "violations": violations,
             "sanitized": sanitized,
             "check_type": check_type,
         }
+        return json.dumps(result)
 
     def _check_pii(self, content: str) -> list:
         violations = []

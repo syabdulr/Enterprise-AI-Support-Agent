@@ -1,31 +1,30 @@
 """Incident management plugin for Semantic Kernel.
 
-This plugin wraps our existing agent capabilities (triage, diagnosis,
-resolution, escalation) as SK kernel functions. In production, these
-would call the LangGraph workflow; here they provide deterministic
-rule-based logic so the system is testable without LLM credentials.
+Provides triage, diagnosis, resolution, and escalation as kernel functions.
+Each function returns a string suitable for SK function-chaining.
 """
 
-import re
+import json
 from typing import Any, Dict, Optional
+
+from semantic_kernel.functions import kernel_function
 
 
 class IncidentPlugin:
-    """SK plugin for incident management agentic patterns."""
+    """SK plugin for incident management."""
 
     def __init__(self) -> None:
         self.name = "IncidentPlugin"
 
-    def triage_incident(self, description: str, severity: str = "medium") -> Dict[str, Any]:
-        """
-        Categorize and prioritize an incident.
-
-        Implements the planning agentic pattern: analyzes the incident
-        description to determine category, urgency, and routing.
-        """
+    @kernel_function(description="Categorize and prioritize an incident based on its description")
+    def triage_incident(
+        self,
+        description: str,
+        severity: str = "medium",
+    ) -> str:
+        """Triage an incident: categorize and assign urgency."""
         desc_lower = description.lower()
 
-        # Categorization rules
         if any(kw in desc_lower for kw in ["database", "db", "sql", "query"]):
             category = "database"
         elif any(kw in desc_lower for kw in ["server", "cpu", "memory", "disk", "infrastructure"]):
@@ -42,34 +41,35 @@ class IncidentPlugin:
         severity_scores = {"critical": 4, "high": 3, "medium": 2, "low": 1}
         urgency = severity_scores.get(severity, 2)
 
-        return {
+        result: Dict[str, Any] = {
             "category": category,
             "severity": severity,
             "urgency": urgency,
             "routing": "on_call_engineer" if urgency >= 3 else "queue",
             "assessment": f"Incident categorized as {category} with {severity} severity",
         }
+        return json.dumps(result)
 
+    @kernel_function(description="Diagnose probable root causes for an incident")
     def diagnose_incident(
         self,
         description: str,
         category: str = "general",
-        context: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
-        """
-        Diagnose the root cause of an incident.
+        context: Optional[str] = None,
+    ) -> str:
+        """Diagnose the root cause of an incident."""
+        context_dict: Dict[str, Any] = {}
+        if context:
+            try:
+                context_dict = json.loads(context)
+            except (json.JSONDecodeError, TypeError):
+                context_dict = {}
 
-        Implements the tool-use pattern: uses context signals to
-        narrow down probable root causes.
-        """
-        context = context or {}
-        probable_causes = []
-
+        probable_causes: list = []
         desc_lower = description.lower()
 
         if category == "database":
-            probable_causes.append("Connection pool exhaustion")
-            probable_causes.append("Long-running query blocking")
+            probable_causes.extend(["Connection pool exhaustion", "Long-running query blocking"])
         elif category == "infrastructure":
             if "cpu" in desc_lower:
                 probable_causes.append("CPU spike from runaway process")
@@ -80,39 +80,39 @@ class IncidentPlugin:
             if not probable_causes:
                 probable_causes.append("Resource saturation")
         elif category == "network":
-            probable_causes.append("DNS resolution failure")
-            probable_causes.append("Firewall rule blocking traffic")
+            probable_causes.extend(["DNS resolution failure", "Firewall rule blocking traffic"])
         elif category == "application":
-            probable_causes.append("Unhandled exception in request handler")
-            probable_causes.append("Dependency service unavailable")
+            probable_causes.extend(
+                [
+                    "Unhandled exception in request handler",
+                    "Dependency service unavailable",
+                ]
+            )
         else:
             probable_causes.append("Requires manual investigation")
 
-        # Use context clues
-        if "last_deploy" in context:
+        if "last_deploy" in context_dict:
             probable_causes.insert(
-                0, f"Recent deployment may be related ({context['last_deploy']})"
+                0, f"Recent deployment may be related ({context_dict['last_deploy']})"
             )
 
-        return {
+        result: Dict[str, Any] = {
             "category": category,
             "probable_causes": probable_causes,
-            "recommended_actions": [f"Investigate: {cause}" for cause in probable_causes[:3]],
+            "recommended_actions": [f"Investigate: {c}" for c in probable_causes[:3]],
             "confidence": 0.75 if probable_causes else 0.3,
         }
+        return json.dumps(result)
 
+    @kernel_function(description="Generate resolution steps for a diagnosed incident")
     def resolve_incident(
         self,
         description: str,
         diagnosis: str,
         category: str = "general",
-    ) -> Dict[str, Any]:
-        """
-        Generate resolution steps for a diagnosed incident.
-
-        Implements the planning pattern: creates step-by-step resolution.
-        """
-        resolution_steps = []
+    ) -> str:
+        """Generate resolution steps for a diagnosed incident."""
+        resolution_steps: list = []
         desc_lower = description.lower()
 
         if "disk" in desc_lower or "space" in desc_lower:
@@ -144,27 +144,24 @@ class IncidentPlugin:
                 "4. Escalate if no resolution found",
             ]
 
-        return {
+        result: Dict[str, Any] = {
             "category": category,
             "diagnosis": diagnosis,
             "steps": resolution_steps,
             "estimated_time": "15-30 minutes",
             "requires_restart": "restart" in " ".join(resolution_steps).lower(),
         }
+        return json.dumps(result)
 
+    @kernel_function(description="Escalate an incident to human review")
     def escalate_incident(
         self,
         description: str,
         reason: str,
         severity: str = "high",
-    ) -> Dict[str, Any]:
-        """
-        Escalate an incident to human review.
-
-        Implements the guardrail pattern: ensures critical incidents
-        get human oversight when automated resolution fails.
-        """
-        return {
+    ) -> str:
+        """Escalate an incident to human review."""
+        result: Dict[str, Any] = {
             "escalated": True,
             "reason": reason,
             "severity": severity,
@@ -172,3 +169,4 @@ class IncidentPlugin:
             "notification": f"ONCALL ALERT: {severity} incident requires human review: {reason}",
             "context": description[:200],
         }
+        return json.dumps(result)
