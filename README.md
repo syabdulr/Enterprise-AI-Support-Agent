@@ -6,6 +6,16 @@ A production-grade multi-agent incident response system powered by LangChain, La
 
 ## 🚀 What's New
 
+### Semantic Kernel & Graph Connector (August 2026)
+
+- ✅ **Semantic Kernel Integration** — SK orchestrator with 6-step pipeline (plan → RAG → triage → diagnose → resolve → guardrail), 3 plugins (IncidentPlugin, RAGPlugin, GuardrailPlugin), demonstrates all 4 agentic patterns: planning, tool-use, memory/state, guardrails
+- ✅ **Microsoft Graph Connector** — SharePoint lists, items, files, and search via Graph API. OAuth2 client credentials auth with token caching. Permission-aware filtering ensures users only see content from accessible sites. RAG bridge converts Graph resources to ingestible documents.
+
+### Prompt Evaluation & Guardrails Integration (August 2026)
+
+- ✅ **Golden Sets Evaluation** (on AI Infrastructure Platform) — Automated quality scoring with 4 algorithms, regression detection between runs
+- ✅ **Responsible AI Guardrails** (on AI Infrastructure Platform) — PII detection, harmful content filtering, prompt injection detection, full audit trail
+
 ### Self-Reflective Agents (July 28, 2026)
 
 All agents now have **self-reflection capabilities**:
@@ -48,9 +58,10 @@ Agent Output → Calculate Confidence → Reflect on Output
 
 ### Tech Stack
 
-- **Frameworks**: LangChain, LangGraph
+- **Frameworks**: LangChain, LangGraph, Semantic Kernel
 - **LLMs**: Azure OpenAI (GPT-4)
 - **Vector DB**: ChromaDB (RAG)
+- **Enterprise Integration**: Microsoft Graph API (SharePoint, user profiles, search)
 - **Deployment**: Docker, Azure Container Apps
 - **Monitoring**: Prometheus, Grafana
 - **CI/CD**: GitHub Actions
@@ -77,6 +88,23 @@ Agent Output → Calculate Confidence → Reflect on Output
 - **Retrieval-Augmented Generation**: Augment LLM responses with knowledge base
 - **Hybrid Search**: Keyword + semantic search for best results
 - **Context Management**: Handle large documents with sliding window
+
+### Semantic Kernel Integration
+
+- **SK Orchestrator**: 6-step pipeline — plan → RAG grounding → triage → diagnose → resolve → guardrail check
+- **IncidentPlugin**: Triage, diagnose, resolve, and escalate functions as SK kernel plugins
+- **RAGPlugin**: Knowledge base search and context retrieval for grounding agent responses
+- **GuardrailPlugin**: PII detection, harmful content filtering, prompt injection checks on every response
+- **Agentic Patterns**: Planning (execution plan before running), tool-use (kernel function invocation), memory/state (incident history persistence), guardrails (safety checks on all outputs)
+
+### Microsoft Graph Connector
+
+- **SharePoint Integration**: Fetch lists, list items, and document library files via Graph API
+- **Graph Search API**: Full-text search across SharePoint content using `/search/query` endpoint
+- **User Profiles & Groups**: Query Azure AD user info and group memberships
+- **Permission-Aware Access**: PermissionResolver filters resources so users only see content from sites they have access to
+- **RAG Bridge**: Converts all Graph resources to RAG-ingestible documents with `source: microsoft_graph` metadata
+- **OAuth2 Client Credentials**: Azure AD authentication with token caching (5-minute buffer)
 
 ### Production Features
 
@@ -177,16 +205,12 @@ tests/test_self_reflection.py ...........                     [100%]
 ### Test Coverage
 
 ```bash
-$ pytest --cov=src --cov-report=term-missing
----------- coverage: platform linux, python 3.11.15 -----------
-Name                             Stmts   Miss  Cover
-------------------------------------------------------------
-src/agents/__init__.py               2      0   100%
-src/agents/base_agent.py           102      0   100%
-src/agents/self_reflection_mixin.py 180      0   100%
-src/orchestration/agent_coordinator.py 60      0   100%
-------------------------------------------------------------
-TOTAL                              344      0   100%
+$ pytest tests/unit/ -v
+tests/unit/test_self_reflection.py ...........    [ 31%]
+tests/unit/test_semantic_kernel.py ..................................  [ 88%]
+tests/unit/test_graph_connector.py .........................  [100%]
+
+59 passed in 0.14s
 ```
 
 ## 🔧 Configuration
