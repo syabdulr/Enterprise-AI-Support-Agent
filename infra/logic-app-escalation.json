@@ -1,0 +1,148 @@
+{
+  "$schema": "https://schema.expressions.azure.com/v1/workflowdefinition.json",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "dataverseUrl": {
+      "type": "string"
+    },
+    "dataverseTenantId": {
+      "type": "string"
+    },
+    "dataverseClientId": {
+      "type": "string"
+    },
+    "dataverseClientSecret": {
+      "type": "securestring"
+    },
+    "teamsWebhookUrl": {
+      "type": "securestring"
+    }
+  },
+  "triggers": {
+    "Every_Five_Minutes": {
+      "type": "Recurrence",
+      "recurrence": {
+        "frequency": "Minute",
+        "interval": 5
+      }
+    }
+  },
+  "actions": {
+    "Poll_Dataverse_For_Escalations": {
+      "type": "Http",
+      "inputs": {
+        "method": "GET",
+        "uri": "@{parameters('dataverseUrl')}/api/data/v9.2/abs_siteincidents?$select=abs_siteincidentid,abs_location,abs_description,abs_severity,abs_status,abs_reporter&$filter=abs_status eq 'open' and (abs_severity eq 'high' or abs_severity eq 'critical')",
+        "authentication": {
+          "type": "ActiveDirectoryOAuth",
+          "authority": "login.microsoftonline.com",
+          "tenant": "@parameters('dataverseTenantId')",
+          "audience": "@parameters('dataverseUrl')",
+          "clientId": "@parameters('dataverseClientId')",
+          "secret": "@parameters('dataverseClientSecret')"
+        }
+      }
+    },
+    "Parse_Incident_Rows": {
+      "type": "ParseJson",
+      "inputs": {
+        "content": "@body('Poll_Dataverse_For_Escalations')",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "value": {
+              "type": "array"
+            }
+          }
+        }
+      },
+      "runAfter": {
+        "Poll_Dataverse_For_Escalations": ["Succeeded"]
+      }
+    },
+    "For_Each_Incident": {
+      "type": "Foreach",
+      "foreach": "@body('Parse_Incident_Rows')?['value']",
+      "actions": {
+        "Is_Critical_Severity": {
+          "type": "If",
+          "expression": {
+            "and": [
+              {
+                "equals": [
+                  "@items('For_Each_Incident')?['abs_severity']",
+                  "critical"
+                ]
+              }
+            ]
+          },
+          "actions": {
+            "Notify_On_Call_Supervisor": {
+              "type": "Http",
+              "inputs": {
+                "method": "POST",
+                "uri": "@parameters('teamsWebhookUrl')",
+                "body": {
+                  "text": "🚨 CRITICAL site incident escalated — Location: @{items('For_Each_Incident')?['abs_location']} | Severity: @{items('For_Each_Incident')?['abs_severity']} | Reported by @{items('For_Each_Incident')?['abs_reporter']} | @{items('For_Each_Incident')?['abs_description']}"
+                }
+              }
+            },
+            "Mark_Record_Escalated": {
+              "type": "Http",
+              "inputs": {
+                "method": "PATCH",
+                "uri": "@{parameters('dataverseUrl')}/api/data/v9.2/abs_siteincidents(@{items('For_Each_Incident')?['abs_siteincidentid']})",
+                "body": {
+                  "abs_status": "escalated"
+                },
+                "headers": {
+                  "If-Match": "*"
+                },
+                "authentication": {
+                  "type": "ActiveDirectoryOAuth",
+                  "authority": "login.microsoftonline.com",
+                  "tenant": "@parameters('dataverseTenantId')",
+                  "audience": "@parameters('dataverseUrl')",
+                  "clientId": "@parameters('dataverseClientId')",
+                  "secret": "@parameters('dataverseClientSecret')"
+                }
+              },
+              "runAfter": {
+                "Notify_On_Call_Supervisor": ["Succeeded"]
+              }
+            }
+          },
+          "else": {
+            "actions": {
+              "Acknowledge_High_Incident": {
+                "type": "Http",
+                "inputs": {
+                  "method": "PATCH",
+                  "uri": "@{parameters('dataverseUrl')}/api/data/v9.2/abs_siteincidents(@{items('For_Each_Incident')?['abs_siteincidentid']})",
+                  "body": {
+                    "abs_status": "acknowledged"
+                  },
+                  "headers": {
+                    "If-Match": "*"
+                  },
+                  "authentication": {
+                    "type": "ActiveDirectoryOAuth",
+                    "authority": "login.microsoftonline.com",
+                    "tenant": "@parameters('dataverseTenantId')",
+                    "audience": "@parameters('dataverseUrl')",
+                    "clientId": "@parameters('dataverseClientId')",
+                    "secret": "@parameters('dataverseClientSecret')"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "runAfter": {
+        "Parse_Incident_Rows": ["Succeeded"]
+      }
+    }
+  },
+  "outputs": {}
+}
