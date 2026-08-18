@@ -19,21 +19,22 @@ class TestSmokeTests:
     def test_core_imports(self):
         """Test core modules can be imported."""
         try:
-            from rag import ChromaDBStore, DocumentLoader, RAGRetriever
-            from llm import AzureOpenAIClient, ChainBuilder
-            from orchestration import WorkflowState, AgentCoordinator
-            from utils.exceptions import EnterpriseAIException, ErrorCode
+            from src.rag import ChromaDBStore, DocumentLoader, RAGRetriever
+            from src.llm import AzureOpenAIClient, ChainBuilder
+            from src.orchestration import WorkflowState, AgentCoordinator
+            from src.utils.exceptions import EnterpriseAIException, ErrorCode
             assert True
         except ImportError as e:
             pytest.fail(f"Failed to import core modules: {e}")
     
     def test_exception_hierarchy(self):
         """Test exception hierarchy is correct."""
-        from utils.exceptions import (
+        from src.utils.exceptions import (
             EnterpriseAIException,
             RAGException,
             LLMException,
-            OrchestrationException
+            OrchestrationException,
+            ErrorCode
         )
         
         # Test inheritance
@@ -47,19 +48,19 @@ class TestSmokeTests:
     
     def test_retry_config(self):
         """Test retry configuration."""
-        from utils.retry import RetryConfig
+        from src.utils.retry import RetryConfig
         
-        config = RetryConfig(max_attempts=5, base_delay=1.0)
+        config = RetryConfig(max_attempts=5, base_delay=1.0, jitter=False)
         assert config.max_attempts == 5
         assert config.base_delay == 1.0
-        
-        # Test delay calculation
+
+        # Test delay calculation (jitter disabled for a deterministic assertion)
         delay = config.calculate_delay(0)
         assert delay == 1.0
     
     def test_workflow_state(self):
         """Test workflow state initialization."""
-        from orchestration.state import WorkflowState, IncidentSeverity
+        from src.orchestration.state import WorkflowState, IncidentSeverity
         
         state = WorkflowState(
             incident_id="SMOKE-001",
@@ -74,14 +75,14 @@ class TestSmokeTests:
     
     def test_document_loader_initialization(self):
         """Test document loader can be initialized."""
-        from rag import DocumentLoader
+        from src.rag import DocumentLoader
         
         loader = DocumentLoader("data/sample_documents")
         assert loader is not None
     
     def test_chunker_initialization(self):
         """Test chunker can be initialized."""
-        from rag import TextChunker
+        from src.rag import TextChunker
         
         chunker = TextChunker(chunk_size=500, chunk_overlap=100)
         assert chunker.chunk_size == 500
@@ -90,7 +91,7 @@ class TestSmokeTests:
     def test_logger_configuration(self):
         """Test logging can be configured."""
         import logging
-        from utils.logging import get_logger
+        from src.utils.logging import get_logger
         
         logger = get_logger("smoke_test")
         assert logger is not None

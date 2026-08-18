@@ -3,15 +3,10 @@ Tests for LLM and LangChain components.
 """
 
 import pytest
-import sys
-from pathlib import Path
 
-# Add src to path
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
-from llm.azure_openai_client import AzureOpenAIClient
-from llm.chain_builder import ChainBuilder
-from llm.prompts import TRIAGE_SYSTEM_PROMPT
+from src.llm.azure_openai_client import AzureOpenAIClient
+from src.llm.chain_builder import ChainBuilder
+from src.llm.prompts import TRIAGE_SYSTEM_PROMPT
 
 
 @pytest.fixture
@@ -47,7 +42,7 @@ def test_chain_builder_initialization():
 
 def test_prompt_templates():
     """Test that prompt templates are defined."""
-    from llm.prompts import (
+    from src.llm.prompts import (
         TRIAGE_SYSTEM_PROMPT,
         DIAGNOSIS_SYSTEM_PROMPT,
         RESOLUTION_SYSTEM_PROMPT,

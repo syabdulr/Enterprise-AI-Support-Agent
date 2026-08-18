@@ -3,15 +3,10 @@ Tests for LangGraph orchestration and workflow components.
 """
 
 import pytest
-import sys
-from pathlib import Path
 
-# Add src to path
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
-from orchestration.state import WorkflowState, IncidentSeverity, IncidentPriority
-from orchestration.agent_coordinator import AgentCoordinator, AgentType
-from orchestration.human_review import HumanReviewManager
+from src.orchestration.state import WorkflowState, IncidentSeverity, IncidentPriority
+from src.orchestration.agent_coordinator import AgentCoordinator, AgentType
+from src.orchestration.human_review import HumanReviewManager
 
 
 def test_workflow_state_initialization():
