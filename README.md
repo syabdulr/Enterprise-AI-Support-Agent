@@ -86,23 +86,23 @@ Agent Output → Calculate Confidence → Reflect on Output
 ### RAG System
 
 - **Retrieval-Augmented Generation**: Augment LLM responses with knowledge base
-- **Hybrid Search**: Keyword + semantic search for best results
+- **Semantic Search**: ChromaDB embedding-similarity retrieval over token-chunked documents (BM25/keyword fusion is a planned addition, not yet implemented)
 - **Context Management**: Handle large documents with sliding window
 
 ### Semantic Kernel Integration
 
 - **SK Orchestrator**: 6-step pipeline — plan → RAG grounding → triage → diagnose → resolve → guardrail check
 - **IncidentPlugin**: Triage, diagnose, resolve, and escalate functions as SK kernel plugins
-- **RAGPlugin**: Knowledge base search and context retrieval for grounding agent responses
+- **RAGPlugin**: Self-contained knowledge-base lookup (word-overlap scoring over a small in-memory sample set) that demonstrates the RAG-grounding step inside the SK pipeline — a separate implementation from the ChromaDB-backed RAG system above, not yet wired to share the same retriever
 - **GuardrailPlugin**: PII detection, harmful content filtering, prompt injection checks on every response
-- **Agentic Patterns**: Planning (execution plan before running), tool-use (kernel function invocation), memory/state (incident history persistence), guardrails (safety checks on all outputs)
+- **Agentic Patterns**: Planning (execution plan before running), tool-use (kernel function invocation), memory/state (incident history persistence), guardrails (safety checks on all outputs) — implemented today as native (deterministic) kernel functions; the registered `AzureChatCompletion` service is the seam for swapping in LLM-backed semantic functions where reasoning beyond rule-based logic is needed
 
 ### Microsoft Graph Connector
 
 - **SharePoint Integration**: Fetch lists, list items, and document library files via Graph API
 - **Graph Search API**: Full-text search across SharePoint content using `/search/query` endpoint
 - **User Profiles & Groups**: Query Azure AD user info and group memberships
-- **Permission-Aware Access**: PermissionResolver filters resources so users only see content from sites they have access to
+- **Permission-Aware Access**: `PermissionResolver` filters resources against an explicitly-set per-user access map so users only see content from sites they have access to (in a live deployment this map would be populated from Graph/directory permissions on ingestion — not yet wired to a live tenant)
 - **RAG Bridge**: Converts all Graph resources to RAG-ingestible documents with `source: microsoft_graph` metadata
 - **OAuth2 Client Credentials**: Azure AD authentication with token caching (5-minute buffer)
 
