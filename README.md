@@ -38,6 +38,53 @@ The Enterprise AI Support Agent is a sophisticated multi-agent system designed t
 - **Hierarchical Agent Architecture**: Specialized agents (Triage, Diagnosis, Resolution, Escalation, Human Review)
 - **Production-Ready**: Full CI/CD, Docker deployment, monitoring, and 99.95% SLA
 
+## 🛡️ Agentic AI Safety & Governance
+
+This system runs agents that triage, diagnose, and resolve incidents with no human in the loop by default — so the governance question isn't "can a person review this," it's "does the system know when it shouldn't act alone." Every stage of the pipeline is built around that question.
+
+```mermaid
+flowchart TD
+    Incident([Incident]) --> Triage[Triage Agent]
+    Triage --> R1{Self-Reflection<br/>confidence score}
+    R1 -->|"≥ 70%"| Diagnose[Diagnosis Agent]
+    R1 -->|"< 70%"| HR1([Human Review])
+
+    Diagnose --> R2{Self-Reflection<br/>confidence score}
+    R2 -->|"≥ 70%"| Resolve[Resolution Agent]
+    R2 -->|"< 70%"| HR2([Human Review])
+
+    Resolve --> Guard[Guardrail Check<br/>PII · harmful content · prompt injection]
+    Guard -->|violation| HR3([Human Review])
+    Guard -->|clean| Review2[Autogen Severity-Review Loop<br/>adversarial second opinion]
+    Review2 -->|disagreement| HR4([Human Review])
+    Review2 -->|agreement| Close([Resolved])
+
+    HR1 --> Metrics[(Reflection Metrics<br/>confidence · escalation rate · history)]
+    HR2 --> Metrics
+    HR3 --> Metrics
+    HR4 --> Metrics
+
+    style HR1 fill:#5a4a1f,stroke:#d4a017,color:#fff
+    style HR2 fill:#5a4a1f,stroke:#d4a017,color:#fff
+    style HR3 fill:#5a4a1f,stroke:#d4a017,color:#fff
+    style HR4 fill:#5a4a1f,stroke:#d4a017,color:#fff
+    style Close fill:#1f5a2e,stroke:#27ae60,color:#fff
+```
+
+| Control | What it does | Where it lives |
+|---|---|---|
+| **Self-reflection & confidence scoring** | Every agent decision gets scored 0-100; anything under 70% auto-escalates instead of proceeding | `src/agents/self_reflection_mixin.py`, `self_critique_engine.py`, `self_correction_engine.py` |
+| **Human Review Agent** | An explicit node in the workflow graph, not an afterthought — low-confidence or guardrail-flagged outputs route here by construction | `src/orchestration/human_review.py` |
+| **Guardrail checks on every response** | PII detection, harmful content filtering, prompt injection checks run inside the SK pipeline itself | `src/sk/plugins/` (`GuardrailPlugin`) |
+| **Autogen severity-review loop** | A second, independent agent re-checks severity/triage calls before they're trusted — an adversarial check, not self-grading | `src/autogen_review/reviewer.py` |
+| **Permission-aware retrieval** | The Graph connector filters SharePoint content against a per-user access map, so RAG can't surface content the requesting user isn't authorized to see | `src/graph/permission_resolver.py` |
+| **Governed data writes** | Agents write incidents through a rate-limited, audited Azure Functions + APIM gateway — no direct database client access | `functions/incident_write/`, `infra/apim.bicep` |
+| **Reflection metrics & audit history** | Confidence distribution, escalation rate, and per-agent history are tracked and reportable, not just logged once | `agent.get_reflection_metrics()`, `agent.get_reflection_report()` |
+
+**Why the escalation threshold matters:** a 70% confidence floor means the system is tuned to escalate too often rather than too rarely — for an autonomous incident-response agent, a false escalation costs a human five minutes; a false resolution can leave a real incident unaddressed. That asymmetry is why auto-escalation is the default behavior, not an opt-in.
+
+**Honesty note:** the guardrail and reflection logic here runs as deterministic (rule-based) kernel functions today, not LLM-judged reasoning — a deliberate choice for auditability at this stage. The registered `AzureChatCompletion` service in the SK orchestrator is the documented seam for swapping in LLM-backed judgment where genuine reasoning (vs. pattern-matching) is needed. This mirrors the isolated-execution-boundary approach used for FXPE's own analyst/judge/adversarial-risk agent fleet.
+
 ## 🏗️ Architecture
 
 ### Agent Workflow
@@ -82,6 +129,8 @@ Agent Output → Calculate Confidence → Reflect on Output
 - **Auto-Escalation**: Low-confidence decisions (<70%) automatically escalate
 - **Reflection History**: Track agent decisions and learning over time
 - **Metrics & Reports**: Monitor agent performance with detailed metrics
+
+See [Agentic AI Safety & Governance](#-agentic-ai-safety--governance) above for how this fits into the full escalation and guardrail pipeline.
 
 ### RAG System
 
