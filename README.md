@@ -201,16 +201,12 @@ cp .env.example .env
 # Start API server (needs a real Azure OpenAI key configured in .env --
 # there is no offline/mock mode for the API itself)
 python -m src.api.main
-
-# See a narrated tour of what was built as of the original commit
-# (this prints hardcoded descriptions, it doesn't call any src/ code)
-python demo/simple_demo.py
 ```
 
 The most reliable way to see the actual system working without Azure
 credentials is the test suite below — it exercises real code paths
 (RAG, workflow orchestration, self-reflection, Dataverse, Graph
-connector) rather than printing a description of them.
+connector) rather than printing a description of them. See DEMO.md.
 
 ### Running Tests
 

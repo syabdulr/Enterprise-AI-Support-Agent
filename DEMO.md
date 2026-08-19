@@ -1,10 +1,10 @@
 # Enterprise AI Support Agent - Demo Guide
 
-## 🚀 Option 1: Run the real test suite (recommended)
+## 🚀 Run the real test suite
 
-This is the most honest demo — it exercises actual code in `src/`
-(RAG, workflow orchestration, self-reflection, Dataverse, Graph
-connector) rather than printing a description of it.
+This is the demo — it exercises actual code in `src/` (RAG, workflow
+orchestration, self-reflection, Dataverse, Graph connector) instead
+of printing a description of it.
 
 ```bash
 cd /data/Claude/enterprise_ai_support_agent
@@ -19,22 +19,7 @@ needs live Azure OpenAI credentials, three are blocked on Python 3.14
 by upstream `semantic-kernel`/`pyautogen` incompatibilities and pass
 on Python ≤3.13).
 
-## 🖥️ Option 2: Narrated walkthrough script
-
-```bash
-cd /data/Claude/enterprise_ai_support_agent
-python demo/simple_demo.py
-```
-
-**What this actually is:** a script of hardcoded `print()` statements
-describing the project as of its first commit (agent registry,
-config management, logging, code structure, roadmap). It has no
-imports from `src/` and does not exercise any real code — treat it as
-a narrated tour, not a functional demo. It also predates the
-Semantic Kernel orchestrator and Microsoft Graph connector work
-described in README.md.
-
-## 📋 What Option 1 Actually Shows
+## 📋 What It Actually Shows
 
 - **RAG pipeline** — document loading, chunking, ChromaDB storage/retrieval
 - **Multi-agent workflow orchestration** — triage → diagnose → resolve → escalate
