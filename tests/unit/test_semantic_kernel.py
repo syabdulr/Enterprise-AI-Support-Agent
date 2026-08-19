@@ -12,6 +12,22 @@ import json
 
 import pytest
 
+pytest.importorskip(
+    "semantic_kernel",
+    exc_type=ImportError,
+    reason=(
+        "semantic-kernel==1.15.0 (pinned in requirements.txt for langchain/"
+        "openai compatibility) fails to import on this interpreter: "
+        "`ImportError: cannot import name 'Url' from 'pydantic.networks'`. "
+        "Newer semantic-kernel releases fix the pydantic.Url import but then "
+        "break IncidentPlugin's @kernel_function type-hint introspection "
+        "under Python 3.14 instead (TypeError: 'member_descriptor' object is "
+        "not iterable). No pydantic version compatible with the older SDK "
+        "has a prebuilt wheel for 3.14 either. Run under Python <=3.13 to "
+        "exercise these tests."
+    ),
+)
+
 from src.sk.kernel_setup import SemanticKernelManager
 from src.sk.models import SKAgentRequest, SKAgentResponse
 from src.sk.orchestrator import SKOrchestrator

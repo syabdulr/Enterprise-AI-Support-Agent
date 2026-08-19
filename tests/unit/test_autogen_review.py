@@ -10,8 +10,19 @@ mocked.
 import json
 from unittest.mock import patch
 
-import autogen
 import pytest
+
+autogen = pytest.importorskip(
+    "autogen",
+    reason=(
+        "Legacy pyautogen (ConversableAgent API, pinned pyautogen==0.2.35 in "
+        "requirements.txt) has no distribution for this interpreter -- every "
+        "pyautogen release on PyPI requires Python <3.14, and the newer "
+        "pyautogen (autogen-agentchat proxy) that does install here dropped "
+        "the top-level `autogen` module this code needs. Run under Python "
+        "<=3.13 to exercise these tests."
+    ),
+)
 
 from src.autogen_review.reviewer import (
     SEVERITY_ORDER,

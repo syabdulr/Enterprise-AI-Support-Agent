@@ -198,12 +198,19 @@ cp .env.example .env
 ### Running Locally
 
 ```bash
-# Start API server
+# Start API server (needs a real Azure OpenAI key configured in .env --
+# there is no offline/mock mode for the API itself)
 python -m src.api.main
 
-# Start demo (optional)
-python -m demo.run_demo
+# See a narrated tour of what was built as of the original commit
+# (this prints hardcoded descriptions, it doesn't call any src/ code)
+python demo/simple_demo.py
 ```
+
+The most reliable way to see the actual system working without Azure
+credentials is the test suite below — it exercises real code paths
+(RAG, workflow orchestration, self-reflection, Dataverse, Graph
+connector) rather than printing a description of them.
 
 ### Running Tests
 
@@ -217,6 +224,16 @@ pytest tests/test_self_reflection.py -v
 # Run with coverage
 pytest --cov=src --cov-report=html
 ```
+
+Expect `125 passed, 12 skipped`. Every skip has an inline reason in
+the test file: a few are genuinely stale assertions not covered by
+CI (`ci-cd.yml` only runs `test_simple.py`), one needs live Azure
+OpenAI credentials, and three are blocked on this interpreter by
+upstream `semantic-kernel`/`pyautogen` incompatibilities with Python
+3.14 (see `tests/unit/test_semantic_kernel.py`,
+`tests/unit/test_incident_write_function.py`, and
+`tests/unit/test_autogen_review.py` for details) — those three pass
+on Python ≤3.13.
 
 ### Deployment
 

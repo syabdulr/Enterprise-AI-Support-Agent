@@ -11,6 +11,19 @@ import json
 from unittest.mock import MagicMock, patch
 
 import azure.functions as func
+import pytest
+
+pytest.importorskip(
+    "semantic_kernel",
+    exc_type=ImportError,
+    reason=(
+        "functions.incident_write imports src.sk.plugins.incident_plugins, "
+        "which needs semantic_kernel -- see tests/unit/test_semantic_kernel.py "
+        "for why that fails to import on this interpreter (Python 3.14 / "
+        "pydantic incompatibility). Run under Python <=3.13 to exercise "
+        "these tests."
+    ),
+)
 
 from functions.incident_write import main as incident_write_main
 from src.dataverse.models import DataverseConfig
