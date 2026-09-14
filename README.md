@@ -162,9 +162,11 @@ See [Agentic AI Safety & Governance](#-agentic-ai-safety--governance) above for 
 - **Monitoring**: Prometheus metrics, Grafana dashboards
 - **Logging**: Structured JSON logging with python-json-logger
 - **Error Recovery**: Automatic retry with exponential backoff
-- **SLA Guarantee**: 99.95% uptime with 30-second rollback
+- **SLA Guarantee**: 99.95% uptime with 30-second rollback (FXPE production benchmark this design targets, not yet independently measured for this repo's own deployment)
 
 ## 📊 Performance Metrics
+
+*Note: figures below are projections based on a comparable self-reflective agent's observed performance at FXPE, not measured results from this repo's test suite or a production deployment of this system.*
 
 - **Accuracy**: 85% (after self-reflection: 92%)
 - **Escalation Rate**: 12.5% (only low-confidence decisions)
