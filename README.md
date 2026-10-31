@@ -24,10 +24,7 @@ All agents now have **self-reflection capabilities**:
 - ✅ **Reflection history** tracking for learning
 - ✅ **Metrics and reports** for monitoring agent performance
 
-**Impact:**
-- +15% accuracy - Agents catch their own mistakes
-- -5% hallucination rate - Self-critique reduces errors
-- +10% fit scores - Better job matching with advanced agentic AI skills
+See [Performance Metrics](#-performance-metrics) for projected impact.
 
 ## 📋 Overview
 
